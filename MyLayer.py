@@ -14,6 +14,7 @@ class GcnLayer(tf.keras.layers.Layer):
     def build(self, input_shape):
         
         #self.wの初期化方法はHeの初期値(https://medium.com/@prateekvishnu/xavier-and-he-normal-he-et-al-initialization-8e3d7a087528)
+        #活性化関数Reluを使用する場合、Heの初期値が有効らしい
         self.w = self.add_weight(shape=[self.input_dimention, self.output_dimention], initializer = tf.keras.initializers.he_normal(), trainable=True)
         self.M = tf.Variable(initial_value=tf.ones((self.nodes, self.nodes)), trainable=True)
         
