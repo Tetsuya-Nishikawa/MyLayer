@@ -7,6 +7,7 @@ class GcnLayer(tf.keras.layers.Layer):
         super(GcnLayer, self).__init__()
         self.output_dimention = output_dimention #出力次元
         self.input_dimention = input_dimention      #入力次元
+        #construct_graph.MakeAdjacencyMatrix()は、自作関数で隣接行列と次数行列を返す関数
         self.adjacency_matrix,self.degree_matrix  = tf.cast(tf.convert_to_tensor(construct_graph.MakeAdjacencyMatrix()), tf.float32) #隣接行列と次数行列
         self.nodes = 49 #ノード数
 
