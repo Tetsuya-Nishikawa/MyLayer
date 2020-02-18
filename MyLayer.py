@@ -18,6 +18,7 @@ class GcnLayer(tf.keras.layers.Layer):
         self.w = self.add_weight(shape=[self.input_dimention, self.output_dimention], initializer = tf.keras.initializers.he_normal(), trainable=True)
         self.M = tf.Variable(initial_value=tf.ones((self.nodes, self.nodes)), trainable=True)
         
+    #とりあえず、compute_mask関数とcall関数の引数にmask=Noneを指定すれば、maskは正しく動作するはず…
     #https://www.tensorflow.org/guide/keras/masking_and_padding　の　”Supporting masking in your custom layers”　にcompute_maskの解説あり
     def compute_mask(self, inputs, mask=None):
         return mask
