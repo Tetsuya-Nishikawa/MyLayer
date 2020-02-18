@@ -11,20 +11,20 @@ class GcnLayer(tf.keras.layers.Layer):
         self.nodes = 49 #ノード数
 
     def build(self, input_shape):
-
+        
+        #self.wの初期化方法はHeの初期値(https://medium.com/@prateekvishnu/xavier-and-he-normal-he-et-al-initialization-8e3d7a087528)
         self.w = self.add_weight(shape=[self.input_dimention, self.output_dimention], initializer = tf.keras.initializers.he_normal(), trainable=True)
-        self.b = self.add_weight(shape=[self.output_dimention,], initializer = tf.keras.initializers.he_normal(), trainable=True)
         self.M = tf.Variable(initial_value=tf.ones((self.nodes, self.nodes)), trainable=True)
         
     #https://www.tensorflow.org/guide/keras/masking_and_padding　の　”Supporting masking in your custom layers”　にcompute_maskの解説あり
     def compute_mask(self, inputs, mask=None):
         return mask
     
-    #https://www.tensorflow.org/guide/keras/masking_and_padding　の　”Writing layers that need mask information”　に引数にmaskを指定する解説
+    #https://www.tensorflow.org/guide/keras/masking_and_padding　の　”Writing layers that need mask information”　に引数にmask=Noneを指定する解説
     def call(self, inputs, mask=None):
         
         A_ElementProduct_M =  tf.multiply(self.adjacency_matrix,self.M)
         L = tf.matmul(self.degree_matrix, tf.matmul(A_ElementProduct_M, self.degree_matrix))
-        outputs = tf.matmul(L, tf.matmul(inputs,self.w))+self.b
+        outputs = tf.matmul(L, tf.matmul(inputs,self.w))
         
         return tf.nn.relu(outputs)
