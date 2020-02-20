@@ -32,7 +32,7 @@ class Model(tf.keras.Model):
 
     def call(self, inputs, mask, Trainable):
 
-        #勝手に定めたグラフプーリング(メモリに乗せるために、書きました。)
+        #勝手に定めたグラフプーリング(メモリに削減するために、書きました。)
         reshaped_inputs = tf.reshape(inputs, [-1, 201, 49, 3, 1])
         #ダミーノードを追加
         reshaped_inputs = tf.pad(reshaped_inputs, [[0,0], [0,0], [1,0], [0,0], [0,0]])
