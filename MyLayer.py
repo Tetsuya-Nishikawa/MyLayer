@@ -44,7 +44,8 @@ class GcnLstmCell(tf.compat.v1.nn.rnn_cell.RNNCell):
         state_size  = tf.TensorShape(units)
         self._state_size = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(state_size, state_size)
         self._output_size = tf.TensorShape(state_size)
-        self.A , self.I , self.D, self.D_self = construct_graph.AandE_Matrix() 
+        #self.Iとself.D_selfは、ここでは使用しません…
+        self.A , self.I , self.D, self.D_self = construct_graph.GetGraphMatrix() 
         #グラフプーリング使用したかどうかで、使用するグラフを決める
         if Pooling==False:
             self.A, self.D = construct_graph.GetAdjacencyAndDegree_Matrix('graph.txt')
