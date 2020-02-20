@@ -31,3 +31,112 @@ class GcnLayer(tf.keras.layers.Layer):
         outputs = tf.matmul(L, tf.matmul(inputs,self.w))
         
         return tf.nn.relu(outputs)
+
+    
+ #LSTMCell
+#https://github.com/tensorflow/tensorflow/blob/v2.1.0/tensorflow/python/ops/rnn_cell_impl.py#L804-L1081を参考にしました。
+class GcnLstmCell(tf.compat.v1.nn.rnn_cell.RNNCell):
+
+    def __init__(self, units, name, Pooling,**kwargs):
+   
+        super(GcnLstmCell, self).__init__(**kwargs)
+        self.nodes = units[0]
+        state_size  = tf.TensorShape(units)
+        self._state_size = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(state_size, state_size)
+        self._output_size = tf.TensorShape(state_size)
+        self.A , self.I , self.D, self.D_self = construct_graph.AandE_Matrix() 
+        #グラフプーリング使用したかどうかで、使用するグラフを決める
+        if Pooling==False:
+            self.A, self.D = construct_graph.GetAdjacencyAndDegree_Matrix('graph.txt')
+        else:
+            self.A, self.D = construct_graph.GetAdjacencyAndDegree_Matrix('graph_after_pooling.txt')
+        self.input_channels = units[1]
+        self.output_channels = units[1]
+        self.cell_name = name
+        
+        self.batch_xi = tf.keras.layers.BatchNormalization()
+        self.batch_hi = tf.keras.layers.BatchNormalization()
+
+        self.batch_xg = tf.keras.layers.BatchNormalization()
+        self.batch_hg = tf.keras.layers.BatchNormalization()
+
+        self.batch_xf = tf.keras.layers.BatchNormalization()
+        self.batch_hf = tf.keras.layers.BatchNormalization()
+
+        self.batch_xo = tf.keras.layers.BatchNormalization()
+        self.batch_ho = tf.keras.layers.BatchNormalization()
+        self.batch_cell = tf.keras.layers.BatchNormalization()
+        
+    def build(self, input_shape):
+
+        self.Wxi = self.add_weight(shape=[self.input_channels, self.output_channels], initializer = tf.keras.initializers.he_normal(), trainable=True, name="wxi"+self.cell_name)
+        self.Whi = self.add_weight(shape=[self.input_channels, self.output_channels], initializer = tf.keras.initializers.he_normal(), trainable=True, name="whi"+self.cell_name)
+        self.Wxg = self.add_weight(shape=[self.input_channels, self.output_channels], initializer = tf.keras.initializers.he_normal(), trainable=True, name="wxg"+self.cell_name)
+        self.Whg = self.add_weight(shape=[self.input_channels, self.output_channels], initializer = tf.keras.initializers.he_normal(), trainable=True, name="whg"+self.cell_name)
+        self.Wxf = self.add_weight(shape=[self.input_channels, self.output_channels], initializer = tf.keras.initializers.he_normal(), trainable=True, name="wxf"+self.cell_name)
+        self.Whf = self.add_weight(shape=[self.input_channels, self.output_channels], initializer = tf.keras.initializers.he_normal(), trainable=True, name="wfg"+self.cell_name)
+        self.Wxo = self.add_weight(shape=[self.input_channels, self.output_channels], initializer = tf.keras.initializers.he_normal(), trainable=True, name="wxo"+self.cell_name)
+        self.Who = self.add_weight(shape=[self.input_channels, self.output_channels], initializer = tf.keras.initializers.he_normal(), trainable=True, name="who"+self.cell_name)
+        self.M = self.add_weight(shape=[self.nodes, self.nodes], initializer=tf.ones_initializer(), trainable=True,  name="M"+self.cell_name)
+        self.built = True
+
+    @property
+    def output_size(self):
+        return self._output_size
+    @property
+    def state_size(self):
+        return self._state_size
+    def compute_mask(self, inputs, mask=None):
+        # Just pass the received mask from previous layer, to the next layer or 
+        # manipulate it if this layer changes the shape of the input
+        return mask
+    def call(self, inputs, states, mask=None, training=True):
+        cell, hidden = states
+        DAD = tf.matmul(self.D, tf.matmul(self.A*self.M, self.D))
+        #f
+        output_xf    = tf.matmul(DAD, tf.matmul(inputs, self.Wxf))
+        forget_gate = tf.matmul(DAD, tf.matmul(hidden, self.Whf))
+        output_xf    =  self.batch_xf(output_xf, training=training)
+        forget_gate =  self.batch_hf(forget_gate, training=training)
+
+        forget_gate = output_xf + forget_gate
+        forget_gate = tf.nn.sigmoid(forget_gate)
+
+        #i
+        output_xi    = tf.matmul(DAD, tf.matmul(inputs, self.Wxi))
+        input_gate =  tf.matmul(DAD, tf.matmul(hidden, self.Whi))
+        output_xi    = self.batch_xi(output_xi, training=training)
+        input_gate =  self.batch_hi(input_gate, training=training)
+
+        input_gate = output_xi + input_gate
+        input_gate = tf.nn.sigmoid(input_gate)
+
+        #g
+        #tensorflowの仕様では、newinputと呼んでるのでここでもそれに従う
+        output_xg    = tf.matmul(DAD, tf.matmul(inputs, self.Wxg))
+        newinput_gate =  tf.matmul(DAD, tf.matmul(hidden, self.Whg))
+        output_xg    = self.batch_xg(output_xg, training=training)
+        newinput_gate =  self.batch_hg(newinput_gate, training=training)
+
+        newinput_gate = output_xg + newinput_gate
+        newinput_gate = tf.nn.tanh(newinput_gate)
+
+        #o
+        output_xo    = tf.matmul(DAD, tf.matmul(inputs, self.Wxo))
+        output_gate = tf.matmul(DAD, tf.matmul(hidden, self.Who))
+        output_xo = self.batch_xo(output_xo, training=training)
+        output_gate =self.batch_ho(output_gate, training=training)
+
+        output_gate = output_xo + output_gate
+        output_gate = tf.nn.sigmoid(output_gate)
+
+        #statesの更新
+        new_cell      = forget_gate * cell + (input_gate * newinput_gate)
+        new_cell      = self.batch_cell(new_cell, training=training)
+        
+        new_hidden = output_gate * tf.nn.tanh(new_cell)
+        new_state   = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(new_cell, new_hidden)
+        
+        return new_hidden, new_state
+  
+  
